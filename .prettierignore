@@ -1,0 +1,9 @@
+# Ignore Django template files
+templates/**/*.html
+*.html
+
+# Ignore Python files
+*.py
+
+# Ignore migrations
+**/migrations/*.py
