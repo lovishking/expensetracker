@@ -1,7 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum, Count
-from django.db.models.functions import TruncMonth
+from django.utils import timezone
+from datetime import timedelta
+from collections import defaultdict
+import json
 from .models import Expense, Category
 from .forms import ExpenseForm, CategoryForm
 
@@ -9,24 +12,101 @@ from .forms import ExpenseForm, CategoryForm
 def expense_list(request):
     """
     Display a list of all expenses with summary statistics.
+    Supports filtering by time period: daily, weekly, monthly, or all.
     """
+    # Get filter parameter from request
+    time_filter = request.GET.get('period', 'all')
+    
+    # Base queryset
     expenses = Expense.objects.all().select_related('category')
+    
+    # Apply time filter
+    now = timezone.now()
+    if time_filter == 'daily':
+        start_date = now.date()
+        expenses = expenses.filter(date=start_date)
+        period_label = "Today"
+    elif time_filter == 'weekly':
+        start_date = now.date() - timedelta(days=now.weekday())  # Start of current week (Monday)
+        expenses = expenses.filter(date__gte=start_date)
+        period_label = "This Week"
+    elif time_filter == 'monthly':
+        start_date = now.date().replace(day=1)  # Start of current month
+        expenses = expenses.filter(date__gte=start_date)
+        period_label = "This Month"
+    else:
+        period_label = "All Time"
+    
     categories = Category.objects.all()
     
-    # Calculate total expenses
+    # Calculate total expenses for the filtered period
     total_amount = expenses.aggregate(total=Sum('amount'))['total'] or 0
     
-    # Get expenses by category
+    # Get expenses by category for the filtered period
     expenses_by_category = expenses.values('category__name').annotate(
         total=Sum('amount'),
         count=Count('id')
     ).order_by('-total')
+    
+    # Prepare data for pie chart (category breakdown)
+    category_labels = [item['category__name'] for item in expenses_by_category]
+    category_data = [float(item['total']) for item in expenses_by_category]
+    
+    # Convert queryset to list to avoid SQLite issues with iteration
+    expenses_list = list(expenses)
+    
+    # Prepare data for line chart (spending over time)
+    trend_labels = []
+    trend_amounts = []
+    
+    if time_filter == 'daily':
+        # For daily view, show just today's total
+        trend_labels = ['Today']
+        trend_amounts = [float(total_amount)]
+    elif time_filter == 'weekly':
+        # Show daily breakdown for the week - group by date in Python
+        daily_totals = defaultdict(float)
+        for expense in expenses_list:
+            daily_totals[expense.date] += float(expense.amount)
+        
+        # Sort by date and format
+        sorted_dates = sorted(daily_totals.keys())
+        trend_labels = [d.strftime('%a') for d in sorted_dates]
+        trend_amounts = [daily_totals[d] for d in sorted_dates]
+    elif time_filter == 'monthly':
+        # Show daily breakdown for the month - group by date in Python
+        daily_totals = defaultdict(float)
+        for expense in expenses_list:
+            daily_totals[expense.date] += float(expense.amount)
+        
+        # Sort by date and format
+        sorted_dates = sorted(daily_totals.keys())
+        trend_labels = [d.strftime('%b %d') for d in sorted_dates]
+        trend_amounts = [daily_totals[d] for d in sorted_dates]
+    else:
+        # Show monthly breakdown for all time - group by month in Python
+        monthly_totals = defaultdict(float)
+        for expense in expenses_list:
+            month_key = expense.date.replace(day=1)  # First day of month
+            monthly_totals[month_key] += float(expense.amount)
+        
+        # Sort by date and format
+        sorted_months = sorted(monthly_totals.keys())
+        trend_labels = [m.strftime('%b %Y') for m in sorted_months]
+        trend_amounts = [monthly_totals[m] for m in sorted_months]
     
     context = {
         'expenses': expenses,
         'categories': categories,
         'total_amount': total_amount,
         'expenses_by_category': expenses_by_category,
+        'time_filter': time_filter,
+        'period_label': period_label,
+        # Chart data
+        'category_labels_json': json.dumps(category_labels),
+        'category_data_json': json.dumps(category_data),
+        'trend_labels_json': json.dumps(trend_labels),
+        'trend_amounts_json': json.dumps(trend_amounts),
     }
     return render(request, 'expenses/expense_list.html', context)
 
