@@ -35,8 +35,8 @@ If you prefer manual setup:
    - **Build Command**: `./build.sh`
    - **Start Command**: `gunicorn expense_tracker.wsgi:application`
    - **Environment Variables**:
-     - `DATABASE_URL`: (auto-filled from database)
-     - `SECRET_KEY`: (generate a secure key)
+     - `DATABASE_URL`: (auto-filled from database - DO NOT set manually)
+     - `SECRET_KEY`: (generate a secure key using Render's "Generate" button)
      - `RENDER`: `true`
      - `DEBUG`: `false`
      - `ALLOWED_HOSTS`: `*`
@@ -100,6 +100,10 @@ If you prefer manual setup:
 1. **Static files not loading**: Ensure `STATIC_ROOT` is set correctly
 2. **Database connection errors**: Check `DATABASE_URL` environment variable
 3. **500 errors**: Check Render logs for detailed error messages
+4. **"Scheme '://' is unknown" error**: This means `DATABASE_URL` is empty or malformed
+   - For Blueprint deployment: Ensure database is created first
+   - For manual deployment: Don't manually set `DATABASE_URL` - let Render auto-fill it
+   - Make sure the database service is linked to your web service
 
 ### Checking Logs:
 
