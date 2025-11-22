@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count
 from django.utils import timezone
 from datetime import timedelta
@@ -9,6 +10,7 @@ from .models import Expense, Category
 from .forms import ExpenseForm, CategoryForm
 
 
+@login_required
 def expense_list(request):
     """
     Display a list of all expenses with summary statistics.
@@ -17,8 +19,8 @@ def expense_list(request):
     # Get filter parameter from request
     time_filter = request.GET.get('period', 'all')
     
-    # Base queryset
-    expenses = Expense.objects.all().select_related('category')
+    # Base queryset - filter by current user
+    expenses = Expense.objects.filter(user=request.user).select_related('category')
     
     # Apply time filter
     now = timezone.now()
@@ -37,7 +39,7 @@ def expense_list(request):
     else:
         period_label = "All Time"
     
-    categories = Category.objects.all()
+    categories = Category.objects.filter(user=request.user)
     
     # Calculate total expenses for the filtered period
     total_amount = expenses.aggregate(total=Sum('amount'))['total'] or 0
@@ -111,45 +113,50 @@ def expense_list(request):
     return render(request, 'expenses/expense_list.html', context)
 
 
+@login_required
 def expense_create(request):
     """
     Create a new expense.
     """
     if request.method == 'POST':
-        form = ExpenseForm(request.POST)
+        form = ExpenseForm(request.POST, user=request.user)
         if form.is_valid():
-            form.save()
+            expense = form.save(commit=False)
+            expense.user = request.user
+            expense.save()
             messages.success(request, 'Expense added successfully!')
             return redirect('expense_list')
     else:
-        form = ExpenseForm()
+        form = ExpenseForm(user=request.user)
     
     return render(request, 'expenses/expense_form.html', {'form': form, 'action': 'Add'})
 
 
+@login_required
 def expense_update(request, pk):
     """
     Update an existing expense.
     """
-    expense = get_object_or_404(Expense, pk=pk)
+    expense = get_object_or_404(Expense, pk=pk, user=request.user)
     
     if request.method == 'POST':
-        form = ExpenseForm(request.POST, instance=expense)
+        form = ExpenseForm(request.POST, instance=expense, user=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'Expense updated successfully!')
             return redirect('expense_list')
     else:
-        form = ExpenseForm(instance=expense)
+        form = ExpenseForm(instance=expense, user=request.user)
     
     return render(request, 'expenses/expense_form.html', {'form': form, 'action': 'Update'})
 
 
+@login_required
 def expense_delete(request, pk):
     """
     Delete an expense.
     """
-    expense = get_object_or_404(Expense, pk=pk)
+    expense = get_object_or_404(Expense, pk=pk, user=request.user)
     
     if request.method == 'POST':
         expense.delete()
@@ -159,11 +166,12 @@ def expense_delete(request, pk):
     return render(request, 'expenses/expense_confirm_delete.html', {'expense': expense})
 
 
+@login_required
 def category_list(request):
     """
     Display a list of all categories.
     """
-    categories = Category.objects.annotate(
+    categories = Category.objects.filter(user=request.user).annotate(
         expense_count=Count('expenses'),
         total_amount=Sum('expenses__amount')
     )
@@ -174,6 +182,7 @@ def category_list(request):
     return render(request, 'expenses/category_list.html', context)
 
 
+@login_required
 def category_create(request):
     """
     Create a new category.
@@ -181,7 +190,9 @@ def category_create(request):
     if request.method == 'POST':
         form = CategoryForm(request.POST)
         if form.is_valid():
-            form.save()
+            category = form.save(commit=False)
+            category.user = request.user
+            category.save()
             messages.success(request, 'Category added successfully!')
             return redirect('category_list')
     else:
@@ -190,11 +201,12 @@ def category_create(request):
     return render(request, 'expenses/category_form.html', {'form': form, 'action': 'Add'})
 
 
+@login_required
 def category_update(request, pk):
     """
     Update an existing category.
     """
-    category = get_object_or_404(Category, pk=pk)
+    category = get_object_or_404(Category, pk=pk, user=request.user)
     
     if request.method == 'POST':
         form = CategoryForm(request.POST, instance=category)
@@ -208,11 +220,12 @@ def category_update(request, pk):
     return render(request, 'expenses/category_form.html', {'form': form, 'action': 'Update'})
 
 
+@login_required
 def category_delete(request, pk):
     """
     Delete a category.
     """
-    category = get_object_or_404(Category, pk=pk)
+    category = get_object_or_404(Category, pk=pk, user=request.user)
     
     if request.method == 'POST':
         category.delete()
