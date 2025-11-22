@@ -25,15 +25,18 @@ def signup_view(request):
 def login_view(request):
     """Custom login view"""
     if request.method == 'POST':
-        username = request.POST['username']
-        password = request.POST['password']
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
-            login(request, user)
-            next_url = request.GET.get('next', 'expense_list')
-            return redirect(next_url)
+        username = request.POST.get('username', '')
+        password = request.POST.get('password', '')
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                next_url = request.GET.get('next', 'expense_list')
+                return redirect(next_url)
+            else:
+                messages.error(request, 'Invalid username or password.')
         else:
-            messages.error(request, 'Invalid username or password.')
+            messages.error(request, 'Please enter both username and password.')
     return render(request, 'registration/login.html')
 
 

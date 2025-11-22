@@ -12,7 +12,7 @@ from .forms import GroupForm, SharedExpenseForm
 @login_required
 def group_list(request):
     """Display list of user's groups"""
-    user_groups = request.user.expense_groups.all()
+    user_groups = request.user.user_groups.all()
     created_groups = request.user.created_groups.all()
     
     context = {

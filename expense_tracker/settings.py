@@ -27,7 +27,14 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-your-secret-key-here-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
+# For production debugging, temporarily enable debug
+if not DEBUG and os.environ.get('SHOW_DEBUG', 'False') == 'True':
+    DEBUG = True
+
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# Add wildcard for deployment if not in debug mode
+if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER'):
+    ALLOWED_HOSTS.append('*')
 
 
 # Application definition
@@ -135,3 +142,25 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# Logging configuration for production debugging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
